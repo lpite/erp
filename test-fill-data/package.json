@@ -1,0 +1,13 @@
+{
+  "name": "test-fill-data",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "csv-parse": "^6.1.0"
+  }
+}
