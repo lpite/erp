@@ -1,10 +1,9 @@
 import { create, insert, remove, search, searchVector, } from '@orama/orama'
 import { Highlight } from '@orama/highlight'
 import { searchWithHighlight, afterInsert as highlightAfterInsert } from '@orama/plugin-match-highlight'
-const highlight = new Highlight({
-  // strategy:""
-  CSSClass: ""
-})
+
+let placesDB: any[] = []
+
 const db = create({
   language: "ukrainian",
   schema: {
@@ -13,11 +12,12 @@ const db = create({
     description: 'string',
     oem: 'string',
     article: 'string',
+    brand: "string"
   }
 })
 Promise.all(Array(10).fill(0).map(async (_, i) => {
   await new Promise((r) => setTimeout(() => r(), 40 * i))
-  const r = await fetch(`http://localhost:8090/api/collections/product/records?perPage=1000&page=${i + 1}`)
+  const r = await fetch(`http://localhost:8090/api/collections/product/records?perPage=1000&page=${i + 1}&expand=brand`)
     .then((r) => r.json());
   if (!r || !r?.items || !r?.items.length) {
     console.log(r)
@@ -28,14 +28,16 @@ Promise.all(Array(10).fill(0).map(async (_, i) => {
     insert(db, {
       id: item.id,
       name: item.name,
-      // description: item.description,
-      // article: item.article
+      description: item.description,
+      article: item.article,
+      brand: item?.expand?.brand?.name || ""
     })
   })
   console.log("done", i)
-})).then(() => {
+})).then(async () => {
+  placesDB = (await fetch("http://localhost:8090/api/collections/storage_place/records?perPage=1000").then(r => r.json()))?.items || [] as any[];
   console.log("all done");
-console.log(db.data.docs.count)
+  console.log(db.data.docs.count)
 })
 const server = Bun.serve({
   routes: {
@@ -55,18 +57,18 @@ const server = Bun.serve({
         // boost: {
         //   name: 2
         // },
-        properties:["name"],
-        limit: 200,
+        limit: 100,
         threshold: 0,
         tolerance: 0,
 
       })
-      console.log(results)
+      // console.log(results)
       if (!results.hits.length) {
         return Response.json({ items: [] })
       }
-      const stocks = await fetch(`http://localhost:8090/api/collections/product_stock_latest/records?perPage=1000&filter=(${results.hits.map(h => `id='${h.document.id}'`).join("||")})`).then(r => r.json()) as { items?: { id: string, stock: number }[] }
-      const prices = await fetch(`http://localhost:8090/api/collections/product_price_latest/records?perPage=1000&filter=(${results.hits.map(h => `id='${h.document.id}'`).join("||")})`).then(r => r.json()) as { items?: { id: string, price: number }[] }
+      const stocks = await fetch(`http://localhost:8090/api/collections/product_stock_latest/records?perPage=100&filter=(${results.hits.map(h => `id='${h.document.id}'`).join("||")})`).then(r => r.json()) as { items?: { id: string, stock: number }[] }
+      const prices = await fetch(`http://localhost:8090/api/collections/product_price_latest/records?perPage=100&filter=(${results.hits.map(h => `id='${h.document.id}'`).join("||")})`).then(r => r.json()) as { items?: { id: string, price: number }[] }
+      const additional = await fetch(`http://localhost:8090/api/collections/product/records?perPage=100&fields=id,places&filter=(${results.hits.map(h => `id='${h.document.id}'`).join("||")})`).then(r => r.json()) as { items?: { id: string, places: string[] }[] }
 
       // const stockPrice = await fetch(`http://localhost:8090/api/collections/products_with_stock_and_price/records?perPage=1000&filter=(${results.hits.map(h => `id='${h.document.id}'`).join("||")})&fields=id,price,stock`).then(r => r.json())
       if (!stocks || !stocks?.items) {
@@ -79,14 +81,27 @@ const server = Bun.serve({
         return Response.json({ error: "cant get prices" }, { status: 500 })
       }
 
+      if (!prices || !additional?.items) {
+        console.log(additional); 
+        return Response.json({ error: "cant get additional" }, { status: 500 })
+      }
+
+      if (!placesDB) {
+        return Response.json({ error: "no placesDB" }, { status: 500 })
+      }
+
+
       return Response.json({
         items: results.hits.map(h => {
           const stock = stocks.items.find(el => el.id === h.id);
           const price = prices.items.find(el => el.id === h.id);
-          Object.keys(h.document).forEach((k) => {
-            h.document[k] = highlight.highlight(h.document[k], q).HTML;
-          })
-          return { ...h.document, stock: stock?.stock, price: price?.price }
+          const places = additional.items.find(el => el.id === h.id);
+
+          console.log(places,places?.places.map((el) => placesDB.find((pl) => pl.id === el)))
+          // Object.keys(h.document).forEach((k) => {
+          //   h.document[k] = highlight.highlight(h.document[k], q).HTML;
+          // })
+          return { ...h.document, stock: stock?.stock, price: price?.price, places: places?.places.map((el) => placesDB.find((pl) => pl.id === el)?.name) }
         })
       })
     }

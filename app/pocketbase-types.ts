@@ -227,6 +227,7 @@ export type SalesDocumentRecord = {
 	posted?: boolean;
 	sum?: number;
 	updated: IsoAutoDateString;
+	comment?: string;
 };
 
 export type SalesDocumentItemRecord = {

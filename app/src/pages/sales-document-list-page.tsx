@@ -35,6 +35,9 @@ const columns = [
 		header: "client",
 		cell: (info) => info.getValue(),
 	}),
+	columnHelper.accessor("comment", {
+		cell: (info) => info.getValue(),
+	}),
 ];
 
 export function SalesDocumentListPage() {

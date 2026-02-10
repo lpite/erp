@@ -4,13 +4,16 @@ import {
 	ProductResponse,
 	SalesDocumentResponse,
 	SalesDocumentItemResponse,
+	BrandResponse,
 } from "../../pocketbase-types";
 import { getProductStock } from "../utils/getProductStock";
 import { pb } from "../utils/pb";
 
+type ProductWithBrand = ProductResponse<{ brand: BrandResponse }>;
+
 export type ExpandedDocumentItem = Omit<
 	SalesDocumentItemResponse<{
-		product: ProductResponse;
+		product: ProductWithBrand;
 	}>,
 	"document" | "collectionId" | "collectionName" | "created" | "updated"
 >;
@@ -19,7 +22,7 @@ export type SalesDocumentItem = Omit<
 	ExpandedDocumentItem,
 	"expand" | "product"
 > & {
-	product: ProductResponse | null;
+	product: (ProductResponse & { brand: BrandResponse }) | null;
 	isNew?: boolean;
 };
 
@@ -37,6 +40,7 @@ const emptyDocument: SalesDocumentResponse = {
 	date: new Date().toISOString(),
 	posted: false,
 	sum: 0,
+	comment: "",
 };
 
 async function validateDocument(document: SalesDocument) {
@@ -111,7 +115,7 @@ export const SalesDocument = {
 			.collection(Collections.SalesDocumentItem)
 			.getList<ExpandedDocumentItem>(0, 200, {
 				filter: `document="${document?.id}"`,
-				expand: "product",
+				expand: "product,product.brand",
 			})
 			.then((r) => r.items)
 			.catch((err) => {
@@ -119,7 +123,13 @@ export const SalesDocument = {
 				return [];
 			})
 			.then((items) =>
-				items.map((el) => ({ ...el, product: el.expand.product })),
+				items.map((el) => ({
+					...el,
+					product: {
+						...el.expand.product,
+						brand: el.expand.product.expand.brand,
+					},
+				})),
 			)) as SalesDocumentItem[];
 
 		return {

@@ -1,3 +1,4 @@
+import { TableContainer } from "@mui/material";
 import Button from "@mui/material/Button";
 import Icon from "@mui/material/Icon";
 import Table from "@mui/material/Table";
@@ -45,6 +46,7 @@ interface TableProps {
   buttons?: TableButtons;
   onRowClick?: () => any;
   onRowDoubleClick?: (row: Row<any>) => any;
+  disabled?: boolean;
 }
 
 const emptyArray: any[] = [];
@@ -56,6 +58,7 @@ export function MyTable({
   buttons,
   onRowClick: onRowClickHandler,
   onRowDoubleClick: onRowDoubleClickHander,
+  disabled,
 }: TableProps) {
   const table = useReactTable({
     data: data ?? emptyArray,
@@ -82,6 +85,7 @@ export function MyTable({
 
   function onCellClick(cell: Cell<any, any>) {
     setSelectedCell(cell.column.id);
+    document.querySelectorAll("input").forEach((el) => el.blur());
   }
 
   useEffect(() => {
@@ -170,7 +174,7 @@ export function MyTable({
   }
 
   return (
-    <div className="pt-4">
+    <div className="pt-2 flex flex-col h-min">
       {buttons ? (
         <div className="pb-2">
           {buttons?.add?.icon || buttons?.add?.text ? (
@@ -179,6 +183,7 @@ export function MyTable({
               color="success"
               size="small"
               onClick={buttons.add.event}
+              disabled={disabled}
             >
               {buttons.add.icon ? <Icon>add</Icon> : null}
               {buttons.add.text ? "Додати" : null}
@@ -197,6 +202,7 @@ export function MyTable({
                   data?.filter((_, i) => i !== Number(selectedRow)) || [],
                 );
               }}
+              disabled={disabled}
             >
               {buttons.remove.icon ? <Icon>cross</Icon> : null}
               {buttons.remove.text ? "remove" : null}
@@ -204,77 +210,84 @@ export function MyTable({
           ) : null}
         </div>
       ) : null}
-
-      <Table
-        style={{
-          borderCollapse: "collapse",
-          border: "1px solid #ccc",
-        }}
-        size="small"
-        stickyHeader={true}
-      >
-        <TableHead>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableCell
-                  key={header.id}
-                  className="text-start border-x border-gray-300"
-                >
-                  {flexRender(
-                    header.column.columnDef.header,
-                    header.getContext(),
-                  )}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableHead>
-        <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow
-              style={{
-                background: selectedRow === row.id ? "#e6f7ff" : "transparent",
-              }}
-              onClick={() => onRowClick(row)}
-              onDoubleClick={() => onRowDoubleClick(row)}
-              key={row.id}
-            >
-              {row.getVisibleCells().map((cell) => {
-                const onChangeHander = cell.column.columnDef.meta?.onChange;
-
-                return (
+      <TableContainer className="">
+        <Table
+          style={{
+            borderCollapse: "collapse",
+            border: "1px solid #ccc",
+          }}
+          size="small"
+          stickyHeader={true}
+        >
+          <TableHead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
                   <TableCell
-                    key={cell.id}
-                    style={{
-                      background:
-                        selectedCell === cell.column.id &&
-                        row.id === selectedRow
-                          ? "#8cceed"
-                          : "transparent",
-                    }}
-                    onClick={() => onCellClick(cell)}
-                    className="text-start border-x border-gray-300 p-0 select-none"
+                    key={header.id}
+                    className="text-start border-x border-gray-300"
                   >
-                    {selectedCell === cell.column.id &&
-                    row.id === selectedRow &&
-                    editCell ? (
-                      <input
-                        onChange={(e) => onChangeHander(row.id, e.target.value)}
-                        autoFocus
-                        onKeyDown={onInputKeyDown}
-                        value={cell.getValue()}
-                      />
-                    ) : (
-                      flexRender(cell.column.columnDef.cell, cell.getContext())
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
                     )}
                   </TableCell>
-                );
-              })}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                ))}
+              </TableRow>
+            ))}
+          </TableHead>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow
+                style={{
+                  background:
+                    selectedRow === row.id ? "#e6f7ff" : "transparent",
+                }}
+                onClick={() => onRowClick(row)}
+                onDoubleClick={() => onRowDoubleClick(row)}
+                key={row.id}
+              >
+                {row.getVisibleCells().map((cell) => {
+                  const onChangeHander = cell.column.columnDef.meta?.onChange;
+
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      style={{
+                        background:
+                          selectedCell === cell.column.id &&
+                          row.id === selectedRow
+                            ? "#8cceed"
+                            : "transparent",
+                      }}
+                      onClick={() => onCellClick(cell)}
+                      className="text-start border-x border-gray-300 p-0 select-none"
+                    >
+                      {selectedCell === cell.column.id &&
+                      row.id === selectedRow &&
+                      editCell ? (
+                        <input
+                          onChange={(e) =>
+                            onChangeHander(row.id, e.target.value)
+                          }
+                          autoFocus
+                          onKeyDown={onInputKeyDown}
+                          value={cell.getValue()}
+                        />
+                      ) : (
+                        flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )
+                      )}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </div>
   );
 }

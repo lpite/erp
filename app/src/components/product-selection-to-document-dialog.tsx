@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
 	createColumnHelper,
@@ -11,8 +11,6 @@ import {
 } from "../../pocketbase-types";
 
 import useSWR from "swr";
-import { pb } from "../utils/pb";
-import { create } from "zustand";
 
 import { IncomeDocumentItem } from "../models/income-document";
 import Button from "@mui/material/Button";
@@ -21,29 +19,43 @@ import { MyTable } from "./table";
 import { createPortal } from "react-dom";
 import TableContainer from "@mui/material/TableContainer";
 import Checkbox from "@mui/material/Checkbox";
+import { useCart } from "../hooks/useCart";
 
 const columnHelper = createColumnHelper<ProductsWithStockAndPriceResponse>();
 const columns = [
 	columnHelper.accessor("id", {
-		cell: (r) => <span dangerouslySetInnerHTML={{ __html: r.getValue() }}></span>,
+		cell: (r) => (
+			<span dangerouslySetInnerHTML={{ __html: r.getValue() }}></span>
+		),
 	}),
 	columnHelper.accessor("oem", {
-		cell: (r) => <span dangerouslySetInnerHTML={{ __html: r.getValue() }}></span>,
+		cell: (r) => (
+			<span dangerouslySetInnerHTML={{ __html: r.getValue() }}></span>
+		),
 	}),
 	columnHelper.accessor("article", {
-		cell: (r) => <span dangerouslySetInnerHTML={{ __html: r.getValue() }}></span>,
+		cell: (r) => (
+			<span dangerouslySetInnerHTML={{ __html: r.getValue() }}></span>
+		),
 	}),
 	columnHelper.accessor("name", {
-		cell: (r) => <span dangerouslySetInnerHTML={{ __html: r.getValue() }}></span>,
+		cell: (r) => (
+			<span dangerouslySetInnerHTML={{ __html: r.getValue() }}></span>
+		),
 	}),
-	columnHelper.accessor("description", {
-		cell: (r) => <span dangerouslySetInnerHTML={{ __html: r.getValue() }}></span>,
+	columnHelper.accessor("brand", {
+		cell: (r) => (
+			<span dangerouslySetInnerHTML={{ __html: r.getValue() }}></span>
+		),
 	}),
 	columnHelper.accessor("price", {
 		cell: (r) => r.getValue(),
 	}),
 	columnHelper.accessor("stock", {
 		cell: (r) => r.getValue(),
+	}),
+	columnHelper.accessor("places", {
+		cell: (r) => r.getValue().map(el => <>{el}<br /></>),
 	}),
 ];
 
@@ -53,9 +65,6 @@ interface ProductSelectionDialogProps {
 	type: "income" | "sales";
 }
 
-const cartStore = create<{ items: IncomeDocumentItem[] }>((_) => ({
-	items: [],
-}));
 
 const emty: never[] = [];
 
@@ -72,43 +81,14 @@ export function ProductSelectionToDocumentDialog({
 	const [newItemPrice, setNewItemPrice] = useState(0);
 	const [searchValue, setSearchValue] = useState("");
 	const [exactSearch, setExactSearch] = useState(false);
-
-	const cartItems = cartStore((s) => s.items);
-	const addToCart = (newItem: IncomeDocumentItem) =>
-		cartStore.setState((state) => {
-			if (
-				state.items.findIndex(
-					(el) => el.product?.id === newItem.product?.id,
-				) === -1
-			) {
-				return {
-					items: [...state.items, newItem],
-				};
-			}
-			return {
-				items: state.items.map((item) => {
-					if (item.product?.id === newItem.product?.id) {
-						return { ...item, quantity: item.quantity + 1 };
-					} else {
-						return item;
-					}
-				}),
-			};
-		});
-	const clearCart = () => cartStore.setState({ items: [] });
+	const { items: cartItems, addItem: addToCart, clearCart } = useCart();
 
 	const { data, isLoading, mutate } = useSWR(
 		["fts", searchValue, exactSearch],
 		() =>
-			fetch(`http://localhost:3000/api/search?q=${searchValue}`).then(r => r.json())
-		// pb
-		// 	.collection(Collections.ProductsWithStockAndPrice)
-		// 	.getList(undefined, 100, {
-		// 		filter: exactSearch
-		// 			? `id = '${searchValue}'`
-		// 			: `for_search~'%${searchValue}%'`,
-		// 	}),
-		// {},
+			fetch(`http://localhost:3000/api/search?q=${searchValue}`).then(
+				(r) => r.json(),
+			),
 	);
 
 	const table = useReactTable({
@@ -135,6 +115,14 @@ export function ProductSelectionToDocumentDialog({
 		clearCart();
 		setIsOpen(false);
 	}
+
+	useEffect(() => {
+		if (isOpen) {
+			document.body.style.overflowY = 'hidden';
+		} else {
+			document.body.style.overflowY = 'initial';
+		}
+	}, [isOpen])
 
 	return (
 		<>
@@ -256,8 +244,7 @@ export function ProductSelectionToDocumentDialog({
 									</form>
 								</div>
 							</div>
-							{isLoading ? "loading" : null}
-							<TableContainer className="mb-24">
+							<TableContainer className="mb-42">
 								<MyTable
 									columns={columns}
 									data={data?.items}
@@ -282,13 +269,41 @@ export function ProductSelectionToDocumentDialog({
 									}}
 								/>
 							</TableContainer>
-							<div className="w-full h-24 fixed bottom-0 bg-white">
-								{cartItems.map((item) => (
-									<div>
-										{item.product?.name} {item.quantity}{" "}
-										{item.price}
-									</div>
-								))}
+							<div className="flex flex-col w-full h-46 fixed bottom-0 bg-white start-0 px-2 py-2">
+								<div className="w-full h-2 bg-gray-400"></div>
+								<div>
+									Сума:{" "}
+									<b>
+										{cartItems
+											.reduce(
+												(acc, c) =>
+													acc + c.price * c.quantity,
+												0,
+											)
+											.toFixed(2)}
+									</b>
+									грн
+									<Button
+										className="mx-4"
+										onClick={clearCart}
+									>
+										Очистити
+									</Button>
+								</div>
+								<div className="overflow-y-auto h-full">
+									{cartItems.map((item) => (
+										<div className="flex gap-1 w-full">
+											<span>{item.product.id}</span>|
+											<span className="grow">
+												{item.product?.name}
+											</span>
+											<span>
+												{item.quantity}x
+												{item.price.toFixed(2)}грн
+											</span>
+										</div>
+									))}
+								</div>
 							</div>
 						</div>
 					)}

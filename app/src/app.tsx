@@ -10,6 +10,7 @@ import { IncomeDocumentPage } from "./pages/income-document-page";
 import ReportsPage from "./pages/reports-page";
 import { SalesDocumentListPage } from "./pages/sales-document-list-page";
 import SalesDocumentPage from "./pages/sales-document-page";
+import { MobilePosPage } from "./pages/mobile-pos-page";
 
 function App() {
   return (
@@ -24,15 +25,11 @@ function App() {
           component={IncomeDocumentListPage}
         />
         <Route path="/income-document/:id" component={IncomeDocumentPage} />
-        <Route
-          path="/list/sales-document"
-          component={SalesDocumentListPage}
-        />
-         <Route
-          path="/sales-document/:id"
-          component={SalesDocumentPage}
-        />
+        <Route path="/list/sales-document" component={SalesDocumentListPage} />
+        <Route path="/sales-document/:id" component={SalesDocumentPage} />
         <Route path="/reports" component={ReportsPage} />
+
+        <Route path="/mobile-pos" component={MobilePosPage} />
       </Switch>
     </>
   );
