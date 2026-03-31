@@ -1,3 +1,4 @@
-import {ProductRecord} from "../../app/pocketbase-types"
+import { FileNameString } from "../../app/pocketbase-types";
+import {FTSDocument} from "../../fts/index"
 
-// export type FtsProduct = ProductRecord && {places:s} 
+export type FtsProduct = FTSDocument & {places:string[];price:number;stock:number,photos:FileNameString[],suppliers:string[]} 

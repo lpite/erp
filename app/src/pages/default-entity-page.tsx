@@ -1,3 +1,1 @@
-export function DefaultEntityPage() {
-	
-}
+export function DefaultEntityPage() {}

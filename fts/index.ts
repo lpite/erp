@@ -1,6 +1,4 @@
-import { create, insert, remove, search, searchVector, } from '@orama/orama'
-import { Highlight } from '@orama/highlight'
-import { searchWithHighlight, afterInsert as highlightAfterInsert } from '@orama/plugin-match-highlight'
+import { create, insert, search, type TypedDocument } from '@orama/orama'
 
 let placesDB: any[] = []
 
@@ -9,16 +7,20 @@ const db = create({
   schema: {
     id: 'string',
     name: 'string',
+    name_for_print:"string",
+    name_for_web:"string",
     description: 'string',
     oem: 'string',
     article: 'string',
     brand: "string"
   }
 })
+export type FTSDocument = TypedDocument<typeof db>
+
 Promise.all(Array(10).fill(0).map(async (_, i) => {
-  await new Promise((r) => setTimeout(() => r(), 40 * i))
+  await new Promise((r) => setTimeout(() => r(""), 40 * i))
   const r = await fetch(`http://localhost:8090/api/collections/product/records?perPage=1000&page=${i + 1}&expand=brand`)
-    .then((r) => r.json());
+    .then((r) => r.json()) as {items:any[]};
   if (!r || !r?.items || !r?.items.length) {
     console.log(r)
     console.error("cant fill db page ", i + 1)
@@ -35,11 +37,12 @@ Promise.all(Array(10).fill(0).map(async (_, i) => {
   })
   console.log("done", i)
 })).then(async () => {
-  placesDB = (await fetch("http://localhost:8090/api/collections/storage_place/records?perPage=1000").then(r => r.json()))?.items || [] as any[];
+  placesDB = (await fetch("http://localhost:8090/api/collections/storage_place/records?perPage=1000").then(r => r.json()) as {items:any[]})?.items || [] as any[];
   console.log("all done");
   console.log(db.data.docs.count)
 })
 const server = Bun.serve({
+  hostname:"0.0.0.0",
   routes: {
     "/api/search": async (req) => {
       const url = req.url.slice(req.url.indexOf("?"))
@@ -62,15 +65,15 @@ const server = Bun.serve({
         tolerance: 0,
 
       })
-      // console.log(results)
+
       if (!results.hits.length) {
         return Response.json({ items: [] })
       }
       const stocks = await fetch(`http://localhost:8090/api/collections/product_stock_latest/records?perPage=100&filter=(${results.hits.map(h => `id='${h.document.id}'`).join("||")})`).then(r => r.json()) as { items?: { id: string, stock: number }[] }
       const prices = await fetch(`http://localhost:8090/api/collections/product_price_latest/records?perPage=100&filter=(${results.hits.map(h => `id='${h.document.id}'`).join("||")})`).then(r => r.json()) as { items?: { id: string, price: number }[] }
-      const additional = await fetch(`http://localhost:8090/api/collections/product/records?perPage=100&fields=id,places&filter=(${results.hits.map(h => `id='${h.document.id}'`).join("||")})`).then(r => r.json()) as { items?: { id: string, places: string[] }[] }
+      const additional = await fetch(`http://localhost:8090/api/collections/product/records?perPage=100&fields=id,places,photos,suppliers&filter=(${results.hits.map(h => `id='${h.document.id}'`).join("||")})`).then(r => r.json()) as { items?: { id: string, places: string[] }[] }
 
-      // const stockPrice = await fetch(`http://localhost:8090/api/collections/products_with_stock_and_price/records?perPage=1000&filter=(${results.hits.map(h => `id='${h.document.id}'`).join("||")})&fields=id,price,stock`).then(r => r.json())
+      
       if (!stocks || !stocks?.items) {
         console.log(stocks);
         return Response.json({ error: "cant get stocks" }, { status: 500 })
@@ -93,14 +96,10 @@ const server = Bun.serve({
 
       return Response.json({
         items: results.hits.map(h => {
-          const stock = stocks.items.find(el => el.id === h.id);
-          const price = prices.items.find(el => el.id === h.id);
-          const places = additional.items.find(el => el.id === h.id);
-
-          console.log(places,places?.places.map((el) => placesDB.find((pl) => pl.id === el)))
-          // Object.keys(h.document).forEach((k) => {
-          //   h.document[k] = highlight.highlight(h.document[k], q).HTML;
-          // })
+          const stock = stocks.items?.find(el => el.id === h.id);
+          const price = prices.items?.find(el => el.id === h.id);
+          const places = additional.items?.find(el => el.id === h.id);
+      
           return { ...h.document, stock: stock?.stock, price: price?.price, places: places?.places.map((el) => placesDB.find((pl) => pl.id === el)?.name) }
         })
       })

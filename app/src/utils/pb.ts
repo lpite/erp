@@ -1,5 +1,6 @@
 import { TypedPocketBase } from "../../pocketbase-types";
 import PocketBase from "pocketbase";
-
-export const pb = new PocketBase("http://localhost:8090") as TypedPocketBase;
-pb.autoCancellation(false)
+const url = window.location.hostname;
+console.log(url);
+export const pb = new PocketBase(`http://${url}:8090`) as TypedPocketBase;
+pb.autoCancellation(false);

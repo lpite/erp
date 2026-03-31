@@ -3,6 +3,6 @@ import { pb } from "../utils/pb";
 import { Entity } from "./base-entity";
 
 export const Product: Entity<ProductResponse> = {
-	create: (data) => pb.collection(Collections.Product).create(data),
-	update: (id, data) => pb.collection(Collections.Product).update(id, data),
+  create: (data) => pb.collection(Collections.Product).create(data),
+  update: (id, data) => pb.collection(Collections.Product).update(id, data),
 };

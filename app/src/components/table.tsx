@@ -37,6 +37,7 @@ type TableButton =
 interface TableButtons {
   add?: TableButton & { event: () => void };
   remove?: TableButton;
+  changeOrder?: TableButton;
 }
 
 interface TableProps {
@@ -66,12 +67,12 @@ export function MyTable({
     getCoreRowModel: getCoreRowModel(),
   });
 
-  const [selectedRow, setSelectedRow] = useState<string | null>(null);
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
   const [editCell, setEditCell] = useState(false);
 
   function onRowClick(row: Row<any>) {
-    setSelectedRow(row.id);
+    setSelectedRow(row.index);
     if (onRowClickHandler) {
       onRowClickHandler();
     }
@@ -88,22 +89,51 @@ export function MyTable({
     document.querySelectorAll("input").forEach((el) => el.blur());
   }
 
+  function moveRowUp() {
+    if (!selectedRow || !data || !changeData) {
+      return;
+    }
+    const newData = [...data];
+    const tempItem = newData[selectedRow - 1];
+    newData[selectedRow - 1] = newData[selectedRow];
+    newData[selectedRow] = tempItem;
+    changeData(newData);
+    setSelectedRow(selectedRow - 1);
+  }
+
+  function moveRowDown() {
+    if (
+      selectedRow === null ||
+      !data?.length ||
+      selectedRow === data?.length - 1 ||
+      !changeData
+    ) {
+      return;
+    }
+    const newData = [...data];
+    const tempItem = newData[selectedRow + 1];
+    newData[selectedRow + 1] = newData[selectedRow];
+    newData[selectedRow] = tempItem;
+    changeData(newData);
+    setSelectedRow(selectedRow + 1);
+  }
+
   useEffect(() => {
     function keyBoardListener(e: KeyboardEvent) {
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
 
       const rows = table.getRowModel().rows;
-      const index = rows.findIndex((r) => r.id === selectedRow);
+      const index = rows.findIndex((r) => r.index === selectedRow);
 
       if (index === -1) return;
 
       if (e.key === "ArrowDown" && index < rows.length - 1) {
-        setSelectedRow(rows[index + 1].id);
+        setSelectedRow(index + 1);
         setEditCell(false);
       }
 
       if (e.key === "ArrowUp" && index > 0) {
-        setSelectedRow(rows[index - 1].id);
+        setSelectedRow(index - 1);
         setEditCell(false);
       }
 
@@ -134,7 +164,7 @@ export function MyTable({
         setSelectedCell(columnIds[currentColumnIndex + 1]);
       }
       if (e.key === "Enter") {
-        if (!selectedCell) {
+        if (!selectedCell || disabled) {
           return;
         }
         const columnIds = table.getVisibleFlatColumns().map((el) => el.id);
@@ -158,25 +188,10 @@ export function MyTable({
     };
   }, [selectedRow, selectedCell]);
 
-  function onInputKeyDown(e: KeyboardEventReact<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      // e.currentTarget.blur();
-      if (data) {
-        const d = data[Number(selectedRow)];
-        if (d) {
-          console.log(d);
-          console.log(selectedCell);
-        }
-      }
-
-      setEditCell(false);
-    }
-  }
-
   return (
-    <div className="pt-2 flex flex-col h-min">
+    <div className="pt-2 flex flex-col">
       {buttons ? (
-        <div className="pb-2">
+        <div className="pb-2 flex gap-1">
           {buttons?.add?.icon || buttons?.add?.text ? (
             <Button
               variant="contained"
@@ -208,6 +223,26 @@ export function MyTable({
               {buttons.remove.text ? "remove" : null}
             </Button>
           ) : null}
+          {buttons.changeOrder ? (
+            <>
+              <Button
+                size="small"
+                disabled={disabled}
+                className="w-10"
+                onClick={moveRowUp}
+              >
+                <Icon>arrow_upward</Icon>
+              </Button>
+              <Button
+                size="small"
+                disabled={disabled}
+                className="w-10"
+                onClick={moveRowDown}
+              >
+                <Icon>arrow_downward</Icon>
+              </Button>
+            </>
+          ) : null}
         </div>
       ) : null}
       <TableContainer className="">
@@ -238,56 +273,136 @@ export function MyTable({
           </TableHead>
           <TableBody>
             {table.getRowModel().rows.map((row) => (
-              <TableRow
-                style={{
-                  background:
-                    selectedRow === row.id ? "#e6f7ff" : "transparent",
-                }}
-                onClick={() => onRowClick(row)}
-                onDoubleClick={() => onRowDoubleClick(row)}
+              <MyRow
                 key={row.id}
-              >
-                {row.getVisibleCells().map((cell) => {
-                  const onChangeHander = cell.column.columnDef.meta?.onChange;
-
-                  return (
-                    <TableCell
-                      key={cell.id}
-                      style={{
-                        background:
-                          selectedCell === cell.column.id &&
-                          row.id === selectedRow
-                            ? "#8cceed"
-                            : "transparent",
-                      }}
-                      onClick={() => onCellClick(cell)}
-                      className="text-start border-x border-gray-300 p-0 select-none"
-                    >
-                      {selectedCell === cell.column.id &&
-                      row.id === selectedRow &&
-                      editCell ? (
-                        <input
-                          onChange={(e) =>
-                            onChangeHander(row.id, e.target.value)
-                          }
-                          autoFocus
-                          onKeyDown={onInputKeyDown}
-                          value={cell.getValue()}
-                        />
-                      ) : (
-                        flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )
-                      )}
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
+                row={row}
+                editCell={editCell}
+                setEditCell={setEditCell}
+                onCellClick={onCellClick}
+                onRowClick={onRowClick}
+                onRowDoubleClick={onRowDoubleClick}
+                selectedCell={selectedCell}
+                selectedRow={selectedRow}
+              />
             ))}
           </TableBody>
         </Table>
       </TableContainer>
     </div>
+  );
+}
+
+function MyRow({
+  row,
+  selectedRow,
+  onRowClick,
+  onRowDoubleClick,
+  onCellClick,
+  selectedCell,
+  editCell,
+  setEditCell,
+}: {
+  row: Row<any>;
+  selectedRow: number | null;
+  onRowClick: any;
+  onRowDoubleClick: any;
+  onCellClick: any;
+  selectedCell: any;
+  editCell: any;
+  setEditCell: any;
+}) {
+  return (
+    <TableRow
+      style={{
+        background: selectedRow === row.index ? "#e6f7ff" : "transparent",
+      }}
+      onClick={() => onRowClick(row)}
+      onDoubleClick={() => onRowDoubleClick(row)}
+      key={row.id}
+    >
+      {row.getVisibleCells().map((cell) => {
+        return (
+          <MyCell
+            key={row.id + "_" + cell.id}
+            cell={cell}
+            row={row}
+            editCell={editCell}
+            setEditCell={setEditCell}
+            onCellClick={onCellClick}
+            selectedCell={selectedCell}
+            selectedRow={selectedRow}
+          />
+        );
+      })}
+    </TableRow>
+  );
+}
+
+type MyCellProps = {
+  selectedCell: string;
+  selectedRow: number | null;
+  cell: Cell<any, unknown>;
+  row: Row<any>;
+  editCell: boolean;
+  setEditCell: any;
+  onCellClick: any;
+};
+
+function MyCell({
+  selectedCell,
+  row,
+  cell,
+  selectedRow,
+  editCell,
+  setEditCell,
+  onCellClick,
+}: MyCellProps) {
+  const onChangeHandler = cell.column.columnDef.meta?.onChange;
+  const editable = cell.column.columnDef.meta?.editable;
+
+  const [cellValue, setCellValue] = useState(cell.getValue() as string);
+  function onKeyDown(e: KeyboardEventReact<HTMLInputElement>) {
+    e.stopPropagation();
+
+    if (e.key === "Enter") {
+      onChangeHandler(row.id, cellValue);
+      setEditCell(false);
+    }
+  }
+
+  useEffect(() => {
+    setCellValue(String(cell.getValue() ?? ""));
+  }, [cell.getValue()]);
+
+  return (
+    <TableCell
+      style={{
+        background:
+          selectedCell === cell.column.id && row.index === selectedRow
+            ? "#8cceed"
+            : "transparent",
+      }}
+      onClick={() => onCellClick(cell)}
+      className="text-start border-x border-gray-300 p-0 select-none"
+    >
+      {selectedCell === cell.column.id &&
+      row.index === selectedRow &&
+      editCell ? (
+        <input
+          autoFocus
+          onKeyDown={onKeyDown}
+          value={cellValue}
+          onBlur={() => {
+            onChangeHandler(row.index, cellValue);
+            setEditCell(false);
+          }}
+          onChange={(e) => setCellValue(e.target.value)}
+        />
+      ) : editable ? (
+        cellValue
+      ) : (
+        flexRender(cell.column.columnDef.cell, cell.getContext())
+      )}
+    </TableCell>
   );
 }
